@@ -1,15 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { MeetingMap } from '@/components/MeetingMap';
-import { mockProfiles } from '@/data/mock-data';
-import { calculateFairness } from '@/services/meeting';
 import { fetchMeetingRecommendations, type MeetingRecommendation } from '@/services/meeting-api';
+import { fetchPublicProfile } from '@/services/profile';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { hasSupabaseConfig } from '@/lib/env';
 import type { MeetingCategory } from '@/types/domain';
 
 const categories: { id: MeetingCategory; label: string; image: number }[] = [
@@ -21,39 +19,36 @@ const categories: { id: MeetingCategory; label: string; image: number }[] = [
   { id: 'study', label: 'Study', image: require('../../../assets/places/study.png') },
 ];
 
-const demoPlaces: Record<MeetingCategory, MeetingRecommendation> = {
-  cafe: { id: 'demo-cafe', name: 'Halfway Coffee', address: 'Public cafe near the halfway area', latitude: 13.806, longitude: 100.524, rating: 4.6, openNow: true, category: 'cafe', yourMinutes: 14, friendMinutes: 16, fairness: calculateFairness(14, 16), totalMinutes: 30 },
-  food: { id: 'demo-food', name: 'Midpoint Noodle House', address: 'Public restaurant near the halfway area', latitude: 13.807, longitude: 100.526, rating: 4.5, openNow: true, category: 'food', yourMinutes: 15, friendMinutes: 16, fairness: calculateFairness(15, 16), totalMinutes: 31 },
-  park: { id: 'demo-park', name: 'Riverside Community Park', address: 'Public park near the halfway area', latitude: 13.804, longitude: 100.522, rating: 4.7, openNow: true, category: 'park', yourMinutes: 13, friendMinutes: 15, fairness: calculateFairness(13, 15), totalMinutes: 28 },
-  mall: { id: 'demo-mall', name: 'Central Meeting Mall', address: 'Public mall near the halfway area', latitude: 13.809, longitude: 100.525, rating: 4.4, openNow: true, category: 'mall', yourMinutes: 16, friendMinutes: 17, fairness: calculateFairness(16, 17), totalMinutes: 33 },
-  cinema: { id: 'demo-cinema', name: 'Neighborhood Cinema', address: 'Public cinema near the halfway area', latitude: 13.805, longitude: 100.528, rating: 4.3, openNow: true, category: 'cinema', yourMinutes: 15, friendMinutes: 18, fairness: calculateFairness(15, 18), totalMinutes: 33 },
-  study: { id: 'demo-study', name: 'Public Library Study Lounge', address: 'Public study space near the halfway area', latitude: 13.803, longitude: 100.523, rating: 4.8, openNow: true, category: 'study', yourMinutes: 14, friendMinutes: 15, fairness: calculateFairness(14, 15), totalMinutes: 29 },
-};
-
-const demoPlace = demoPlaces.cafe;
-
 export default function MeetingScreen() {
   const { id, matchId, name } = useLocalSearchParams<{ id: string; matchId?: string; name?: string }>();
-  const profile = mockProfiles.find((item) => item.id === id);
-  const displayName = profile?.displayName || name || 'your match';
-  const live = Boolean(hasSupabaseConfig && matchId);
+  const [displayName, setDisplayName] = useState(name || 'your match');
   const [category, setCategory] = useState<MeetingCategory>('cafe');
-  const [places, setPlaces] = useState<MeetingRecommendation[]>(live ? [] : [demoPlace]);
-  const [selectedId, setSelectedId] = useState(live ? '' : demoPlace.id);
+  const [places, setPlaces] = useState<MeetingRecommendation[]>([]);
+  const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState(live ? 'Ready to search for public meeting places.' : 'Demo recommendation');
+  const [notice, setNotice] = useState(matchId ? 'Ready to search for public meeting places.' : 'Open Fair Meeting from an active match.');
+
+  useEffect(() => {
+    if (!id) return;
+    let mounted = true;
+    fetchPublicProfile(id)
+      .then((profile) => {
+        if (mounted) setDisplayName(profile.display_name || name || 'your match');
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [id, name]);
 
   const selected = useMemo(
-    () => places.find((place) => place.id === selectedId) ?? places[0] ?? demoPlace,
+    () => places.find((place) => place.id === selectedId) ?? places[0] ?? null,
     [places, selectedId],
   );
 
   const search = async () => {
-    if (!hasSupabaseConfig || !matchId) {
-      const demo = demoPlaces[category];
-      setPlaces([demo]);
-      setSelectedId(demo.id);
-      setNotice('Demo ' + category + ' recommendation');
+    if (!matchId) {
+      setNotice('Open Fair Meeting from an active match.');
       return;
     }
 
@@ -63,14 +58,15 @@ export default function MeetingScreen() {
       const results = await fetchMeetingRecommendations(matchId, category);
       if (!results.length) {
         setPlaces([]);
+        setSelectedId('');
         setNotice('No suitable public places found. Try another category.');
         return;
       }
       setPlaces(results);
       setSelectedId(results[0].id);
       setNotice('Ranked by balanced travel time.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not load meeting recommendations.';
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Could not load meeting recommendations.';
       setNotice(message.includes('google_meeting_api_not_configured')
         ? 'Google Places/Routes keys are not configured yet.'
         : message);
@@ -80,6 +76,7 @@ export default function MeetingScreen() {
   };
 
   const openInMaps = async () => {
+    if (!selected) return;
     const url = 'https://www.google.com/maps/search/?api=1&query=' + selected.latitude + ',' + selected.longitude;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -115,15 +112,15 @@ export default function MeetingScreen() {
         })}
       </ScrollView>
 
-      <SabaiButton label={loading ? 'Finding places…' : 'Find fair places'} disabled={loading} onPress={search} />
+      <SabaiButton label={loading ? 'Finding places…' : 'Find fair places'} disabled={loading || !matchId} onPress={search} />
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-      {places.length ? (
+      {selected ? (
         <>
           <View style={styles.result}>
             <View style={styles.resultTop}>
               <View style={styles.resultCopy}>
-                <Text style={styles.recommended}>{selected.id.startsWith('demo-') ? 'DEMO RECOMMENDATION' : 'TOP RECOMMENDATION'}</Text>
+                <Text style={styles.recommended}>TOP RECOMMENDATION</Text>
                 <Text style={styles.place}>{selected.name}</Text>
                 {selected.address ? <Text style={styles.address}>{selected.address}</Text> : null}
               </View>
@@ -185,7 +182,7 @@ export default function MeetingScreen() {
           <Image source={require('../../../assets/illustrations/no-place-found.png')} style={styles.noPlaceImage} resizeMode="contain" />
           <View style={styles.noPlaceCopy}>
             <Text style={styles.noPlaceTitle}>No destination selected</Text>
-            <Text style={styles.noPlaceText}>{live ? 'Choose a category, then search for a public meeting place.' : 'No places in this category yet.'}</Text>
+            <Text style={styles.noPlaceText}>Choose a category, then search for a real public meeting place.</Text>
           </View>
         </View>
       )}

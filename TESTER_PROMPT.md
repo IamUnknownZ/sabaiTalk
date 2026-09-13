@@ -24,25 +24,25 @@ Current stack:
 - React 19.1
 - Expo Router 6
 - TypeScript 5.9
-- Supabase integration with demo-mode fallbacks
+- Supabase-backed real-data-only runtime (no fake-user fallback)
 - react-native-maps on mobile
 - web-safe meeting-map fallback
 
-## Regression targets from the previous FAIL report
+## Regression targets
 
 Re-test these first and only mark them fixed if reproduced behavior is now correct:
-- BUG-001: demo-sent chat messages must appear immediately, survive reopening the chat, and submit with Enter/Return.
-- BUG-002: Pass/Like must remove decided profiles; after all candidates, show an exhausted-feed state instead of cycling back.
-- BUG-003: Log out / Exit demo must clear demo state, sign out live auth when configured, and land outside the tab shell.
-- BUG-004: onboarding must enforce 3–6 interests and prevent a seventh selection.
-- BUG-005: blank display name or blank bio must not advance onboarding.
-- BUG-006: Open destination in Maps must open a sensible Google Maps destination on web.
-- BUG-007: demo meeting recommendations must change with Cafe/Food/Park/Mall/Cinema/Study.
-- BUG-008: web location request must timeout/recover instead of trapping onboarding.
-- BUG-009: Matches photos must remain compact; they must not expand to intrinsic 768px-tall strips, and an odd final item must stay the same two-column width instead of stretching across the row.
-- BUG-010: Discover profile image must remain compact enough that identity and Like/Pass are reachable in a normal mobile viewport.
-- BUG-011: Radar must explicitly say it is illustrative and must not place people as directional/compass-like pins.
-- BUG-012: bio input must never exceed 160 characters, including paste/fast typing on web.
+- Chat messages must come only from the real messages table, appear immediately, survive reopening, and submit with Enter/Return.
+- Pass/Like must persist through the real RPCs and remove decided profiles from the current discovery flow.
+- Log out must sign out Supabase auth and land outside the tab shell.
+- Onboarding must enforce 3–6 interests from the real `interests` catalog and prevent a seventh selection.
+- Blank display name or blank bio must not advance onboarding.
+- Foreground location must be saved successfully to Supabase before Discover can start.
+- Open destination in Maps must open the selected real destination.
+- Fair Meeting must never create a local placeholder recommendation when Places/Routes is unavailable.
+- Matches photos must remain compact and an odd final item must stay the same two-column width.
+- Discover profile image must keep identity and Like/Pass reachable in a normal mobile viewport.
+- Radar must explicitly remain illustrative and must not imply real direction/bearing.
+- Bio input must never exceed 160 characters, including paste/fast typing on web.
 
 Visual baseline: the current UI intentionally follows repo2 (`.template-research/repo2-tinder-expo`) as the primary visual skeleton and repo1 as secondary support, recolored/rebranded for SabaiTalk. Flag screens that drift back into generic dashboard/card-heavy AI-style layouts.
 
@@ -54,8 +54,9 @@ You may:
 - start the Expo web app,
 - use browser automation, screenshots, DOM tools, accessibility tools or computer-control tools,
 - click, type, navigate and resize the app,
-- use the built-in demo mode,
-- use clearly synthetic data only inside the local demo/offline fallback when needed. If a real Supabase environment is configured, use tester-created accounts and normal user actions instead; never seed fake users, matches, chats, locations, or meeting records into the live test database.
+- use tester-created accounts and normal user actions in the configured Supabase environment.
+
+The runtime is real-data-only. Never create a fake-user fallback or seed fake users, matches, chats, locations, or meeting records into the live database.
 
 Do **not**:
 - modify production data or external accounts,
@@ -68,7 +69,7 @@ Do **not**:
 - perform destructive actions on the machine,
 - treat illustrative radar positions as real locations.
 
-If credentials are missing, test the demo path instead and clearly mark live-backend tests as **NOT TESTED** rather than failed.
+If credentials are missing, verify that the app shows an explicit configuration/error/empty state without fabricating data, and mark live-backend tests as **NOT TESTED**.
 
 ## Start-up
 
@@ -80,7 +81,7 @@ First inspect `README.md`, `SYSTEM.md`, `SECURITY.md`, and `ASSETS.md`.
 
 Then run:
 ```bash
-npm install
+npm ci
 npm run typecheck
 npm run lint
 npx expo start --web
@@ -104,7 +105,7 @@ Test at least:
 Test:
 Welcome → Get started → Login → Create account → Profile setup → Interests → Location.
 
-In demo mode, use the demo/preview controls when credentials are unavailable.
+When credentials are unavailable, verify the explicit configuration state; there must be no demo/preview bypass.
 
 Check:
 - no clipped text,

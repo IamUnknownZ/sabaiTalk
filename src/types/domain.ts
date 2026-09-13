@@ -14,12 +14,4 @@ export type UserProfile = {
   interests: Interest[];
 };
 
-export type Conversation = {
-  id: string;
-  user: UserProfile;
-  lastMessage: string;
-  updatedLabel: string;
-  unread: number;
-};
-
 export type MeetingCategory = 'cafe' | 'food' | 'park' | 'mall' | 'cinema' | 'study';

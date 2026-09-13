@@ -3,6 +3,8 @@
 เอกสารนี้ใช้สำหรับส่งต่อให้คนอื่นตั้งค่า API จริงของ SabaiTalk ต่อจาก placeholder ที่มีอยู่ในโปรเจกต์
 
 > Path ทั้งหมดในเอกสารนี้เริ่มจาก root ของ workspace SabaiTalk
+>
+> Runtime ปัจจุบันเป็น **real-data-only**: ถ้า API/backend ยังไม่ถูกตั้งค่าหรือ request ล้มเหลว แอปจะแสดง error/empty state และจะไม่ fallback ไป fake profiles, chats, locations หรือ meeting recommendations
 
 ---
 
@@ -203,8 +205,13 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_ANDROID_MAPS_KEY
 .env.local
 ```
 
-หมายเหตุ:
-ก่อนทำ Android restriction จริง ต้องมี `android.package` ที่แน่นอนใน Expo config
+Android package ของโปรเจกต์ถูกกำหนดไว้แล้วเป็น:
+
+```text
+com.iamunknownz.sabaitalk
+```
+
+ให้ใช้ package นี้ตอนสร้าง Android application restriction และเพิ่ม SHA-1 ของ signing certificate ที่ตรงกับ build ที่จะติดตั้ง
 
 ---
 

@@ -3,22 +3,23 @@
 SabaiTalk is a location-based social matching app focused on discovering compatible people nearby and recommending a fair public meeting place after a mutual match.
 
 ## Core flow
+
 ```text
-Login
+Login / Register
 → Profile + Interests
-→ Location
+→ Foreground Location
 → Nearby Discovery
-→ Match Score
 → Like / Pass
 → Mutual Match
 → Realtime Chat
 → Find a Place to Meet
-→ Places + Routes
+→ Google Places + Routes
 → Fair Meeting Recommendation
-→ Meeting Map
+→ Destination-only Map
 ```
 
 ## Current stack
+
 - Expo SDK 54
 - React Native 0.81.5
 - React 19.1
@@ -27,42 +28,86 @@ Login
 - Supabase Auth / Postgres / PostGIS / Storage / Realtime
 - `expo-location`
 - `react-native-maps`
-- Google Places
-- Google Routes
+- Google Places API (New)
+- Google Routes API
 
-## Current implementation status
-The V1 foundation is implemented: auth/onboarding, privacy-safe nearby discovery, match scoring, like/pass and mutual matches, realtime chat services, avatar upload, block/report flows, and fair public meeting-place recommendations.
+## Runtime data policy: real-data-only
 
-The app can also run in demo mode before external credentials are configured.
+The application runtime does **not** fabricate profiles, conversations, chat messages, likes, passes, matches, locations, or meeting recommendations.
 
-SDK 54 migration verification:
-- `expo install --check` — dependencies up to date
-- `npm run typecheck` — passes
-- `npm run lint` — passes
-- `npx expo-doctor` — 18/18 checks pass
-- Metro startup smoke test — passes
+- Missing Supabase configuration produces an explicit setup/error state.
+- Failed backend requests do not silently fall back to fake users.
+- Discover uses only rows returned by the protected Supabase/PostGIS flow.
+- Matches and chats use only real match/message rows.
+- Fair Meeting uses only real recommendations returned by the deployed Edge Function.
+- User avatars come from Supabase Storage; the local SabaiTalk logo mark is only a neutral visual fallback.
+- The `interests` rows inserted by the migration are a static application catalog, not fake user/activity data.
 
-Live end-to-end verification still requires the real Supabase project credentials and Google Places/Routes server keys.
+## First-time setup
 
-## Project documents
-Read these before implementation:
-- `AGENTS.md` — rules for coding agents
-- `AI_CONTEXT.md` — durable system memory/handoff for the next AI (summary only; does not override AGENTS/SYSTEM)
-- `SYSTEM.md` — product/system specification
-- `IMPLEMENTATION_PLAN.md` — detailed build sequence
-- `API_SETUP.md` — credential placeholders and setup boundaries
-- `SECURITY.md` — location, auth, API-key and privacy requirements
-- `LICENSES.md` — open-source/template tracking
-- `TESTER_PROMPT.md` — reusable browser/computer-control QA prompt for an AI tester
-- `ref/` — visual references and palette
-
-## Environment
-Copy:
-```text
-.env.example
-→ .env.local
+```bash
+npm ci
+cp .env.example .env.local
 ```
 
-Do not commit real secrets.
+Then configure the real client values in `.env.local`:
 
-Credentials are configured progressively when each integration reaches its verification stage; development should not be blocked globally just because a later API key is not yet available.
+```env
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
+```
+
+Server-only Google Places/Routes keys belong in Supabase Edge Function Secrets, never in `EXPO_PUBLIC_*`.
+
+Read `REAL_API_HANDOFF.md` for the complete key/deployment checklist.
+
+## Android identity
+
+Permanent Android package:
+
+```text
+com.iamunknownz.sabaitalk
+```
+
+Use this exact package when restricting the Android Maps API key. The signing certificate SHA-1 must also match the build being installed.
+
+## Backend deployment required
+
+For a new Supabase project:
+
+1. Configure/link the Supabase project.
+2. Apply `supabase/migrations/0001_initial.sql`.
+3. Apply `supabase/migrations/0002_matching_privacy_hardening.sql`.
+4. Configure `GOOGLE_PLACES_API_KEY` and `GOOGLE_ROUTES_API_KEY` as Edge Function secrets.
+5. Deploy `supabase/functions/meeting-recommendations/index.ts`.
+6. Create real tester accounts and verify Auth → Location → Discover → Match → Chat → Fair Meeting.
+
+Do not seed fake user activity into production.
+
+## Validation
+
+Before handing over or committing:
+
+```bash
+npm run typecheck
+npm run lint
+npx expo-doctor
+```
+
+For UI/routing work also run the web QA flow and exports.
+
+A code/config pass does not replace live acceptance: Supabase RLS/RPCs, Realtime, Google Places/Routes, signing restrictions, and native Maps must still be verified with the actual project credentials and an Android build/device.
+
+## Project documents
+
+Recommended reading order:
+
+1. `README.md` — current project status and setup
+2. `AI_CONTEXT.md` — architecture/history context
+3. `REAL_API_HANDOFF.md` — real API and deployment handoff
+4. `API_SETUP.md` — integration details
+5. `SECURITY.md` — privacy/security requirements
+6. `AGENTS.md` / `SYSTEM.md` — implementation constraints
+
+Additional planning/reference documents remain in the repository for design history.

@@ -1,7 +1,7 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { Screen } from '@/components/ui/Screen';
 import { ProfileCard } from '@/components/ProfileCard';
@@ -9,10 +9,8 @@ import { NearbyRadar } from '@/components/NearbyRadar';
 import { IllustratedEmptyState } from '@/components/ui/IllustratedEmptyState';
 import { colors, radius, shadow, spacing } from '@/constants/theme';
 import { useNearbyProfiles } from '@/hooks/use-nearby-profiles';
-import { getDemoActedProfileIds, saveDemoActedProfileIds } from '@/lib/demo-state';
+import { useMyProfile } from '@/hooks/use-my-profile';
 import { likeProfile, passProfile } from '@/services/social';
-
-const viewerInterests = ['gaming', 'music', 'coding', 'coffee'];
 
 export default function DiscoverScreen() {
   const [mode, setMode] = useState<'cards' | 'nearby'>('nearby');
@@ -20,16 +18,13 @@ export default function DiscoverScreen() {
   const [actedIds, setActedIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
-  const { profiles: candidates, loading, usingDemo } = useNearbyProfiles(radiusKm);
+  const { profiles: candidates, loading, error } = useNearbyProfiles(radiusKm);
+  const { profile: myProfile } = useMyProfile();
 
-  useEffect(() => {
-    if (!usingDemo) return;
-    let mounted = true;
-    void getDemoActedProfileIds().then((ids) => {
-      if (mounted) setActedIds(ids);
-    });
-    return () => { mounted = false; };
-  }, [usingDemo]);
+  const viewerInterestIds = useMemo(
+    () => (myProfile?.interests ?? []).map((interest) => interest.slug),
+    [myProfile],
+  );
 
   const available = useMemo(
     () => candidates.filter((profile) => !actedIds.includes(profile.id)),
@@ -39,30 +34,24 @@ export default function DiscoverScreen() {
   const selected = available.find((profile) => profile.id === selectedId);
   const target = mode === 'nearby' ? selected : current;
 
-  const markActed = async (profileId: string) => {
-    const next = [...new Set([...actedIds, profileId])];
-    setActedIds(next);
+  const markActed = (profileId: string) => {
+    setActedIds((currentIds) => [...new Set([...currentIds, profileId])]);
     if (selectedId === profileId) setSelectedId(null);
-    if (usingDemo) await saveDemoActedProfileIds(next);
   };
 
   const like = async (): Promise<boolean> => {
     if (!target || acting) return false;
-    if (usingDemo) {
-      await markActed(target.id);
-      return true;
-    }
 
     setActing(true);
     try {
       const matchId = await likeProfile(target.id);
-      await markActed(target.id);
+      markActed(target.id);
       if (matchId) {
         router.push({ pathname: '/match/[id]', params: { id: matchId, profileId: target.id, name: target.displayName } });
       }
       return true;
-    } catch (error) {
-      Alert.alert('Could not like profile', error instanceof Error ? error.message : 'Please try again.');
+    } catch (cause) {
+      Alert.alert('Could not like profile', cause instanceof Error ? cause.message : 'Please try again.');
       return false;
     } finally {
       setActing(false);
@@ -71,18 +60,14 @@ export default function DiscoverScreen() {
 
   const pass = async (): Promise<boolean> => {
     if (!target || acting) return false;
-    if (usingDemo) {
-      await markActed(target.id);
-      return true;
-    }
 
     setActing(true);
     try {
       await passProfile(target.id);
-      await markActed(target.id);
+      markActed(target.id);
       return true;
-    } catch (error) {
-      Alert.alert('Could not pass profile', error instanceof Error ? error.message : 'Please try again.');
+    } catch (cause) {
+      Alert.alert('Could not pass profile', cause instanceof Error ? cause.message : 'Please try again.');
       return false;
     } finally {
       setActing(false);
@@ -93,6 +78,10 @@ export default function DiscoverScreen() {
     if (!target) return;
     router.push({ pathname: '/profile/[id]', params: { id: target.id, distance: String(target.distanceKm) } });
   };
+
+  const emptyBody = radiusKm < 10
+    ? 'No more real profiles are available in this range. Try a wider range.'
+    : 'No more real profiles are available right now.';
 
   return (
     <Screen scroll contentStyle={styles.screen}>
@@ -126,7 +115,9 @@ export default function DiscoverScreen() {
         {loading ? 'Loading…' : mode === 'nearby' ? available.length + ' nearby • tap a person' : available.length + ' profiles left • swipe or tap'}
       </Text>
 
-      {mode === 'nearby' ? (
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {!error && mode === 'nearby' ? (
         available.length ? (
           <>
             <NearbyRadar profiles={available} radiusKm={radiusKm} onSelect={(profile) => setSelectedId(profile.id)} />
@@ -139,7 +130,7 @@ export default function DiscoverScreen() {
                   compact
                   disabled={acting}
                   profile={selected}
-                  viewerInterestIds={viewerInterests}
+                  viewerInterestIds={viewerInterestIds}
                   onLike={like}
                   onPass={pass}
                   onOpen={openProfile}
@@ -147,16 +138,16 @@ export default function DiscoverScreen() {
               </Animated.View>
             ) : null}
           </>
-        ) : (
+        ) : !loading ? (
           <IllustratedEmptyState
             image={require('../../../assets/illustrations/empty-nearby.png')}
             title="You’re caught up"
-            body={radiusKm < 10 ? 'You’ve decided on everyone here. Try a wider range.' : 'You’ve reached the end of the current demo feed.'}
+            body={emptyBody}
             actionLabel={radiusKm < 10 ? 'Use 10 km' : undefined}
             onAction={radiusKm < 10 ? () => setRadiusKm(10) : undefined}
           />
-        )
-      ) : current ? (
+        ) : null
+      ) : !error && current ? (
         <Animated.View
           key={current.id}
           entering={FadeInDown.duration(240)}
@@ -164,21 +155,21 @@ export default function DiscoverScreen() {
           <ProfileCard
             disabled={acting}
             profile={current}
-            viewerInterestIds={viewerInterests}
+            viewerInterestIds={viewerInterestIds}
             onLike={like}
             onPass={pass}
             onOpen={openProfile}
           />
         </Animated.View>
-      ) : (
+      ) : !error && !loading ? (
         <IllustratedEmptyState
           image={require('../../../assets/illustrations/empty-nearby.png')}
           title="You’re caught up"
-          body={radiusKm < 10 ? 'You’ve decided on everyone here. Try a wider range.' : 'You’ve reached the end of the current demo feed.'}
+          body={emptyBody}
           actionLabel={radiusKm < 10 ? 'Use 10 km' : undefined}
           onAction={radiusKm < 10 ? () => setRadiusKm(10) : undefined}
         />
-      )}
+      ) : null}
 
       {acting ? <Text style={styles.working}>Saving…</Text> : null}
     </Screen>
@@ -196,5 +187,6 @@ const styles = StyleSheet.create({
   radiusTextActive: { color: colors.primaryStrong },
   radiusDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primaryStrong, marginTop: 4 },
   counter: { color: colors.textMuted, fontSize: 11, textAlign: 'center', marginBottom: spacing.sm },
+  error: { color: colors.danger, fontSize: 12, lineHeight: 18, textAlign: 'center', marginVertical: spacing.lg },
   working: { color: colors.textMuted, textAlign: 'center', fontSize: 12, marginTop: spacing.sm },
 });

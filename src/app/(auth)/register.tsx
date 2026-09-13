@@ -20,7 +20,7 @@ export default function RegisterScreen() {
 
   const submit = async () => {
     if (!hasSupabaseConfig) {
-      router.replace('/(onboarding)/profile-setup');
+      setError('Supabase is not configured. Add the real client URL and anon key to .env.local.');
       return;
     }
 
@@ -35,8 +35,8 @@ export default function RegisterScreen() {
         return;
       }
       router.replace('/(onboarding)/profile-setup');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create account.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not create account.');
     } finally {
       setBusy(false);
     }
@@ -113,7 +113,7 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.actions}>
-          <SabaiButton label={!hasSupabaseConfig ? 'Continue setup in demo' : busy ? 'Creating...' : 'Create account'} disabled={busy} onPress={submit} />
+          <SabaiButton label={busy ? 'Creating...' : 'Create account'} disabled={busy} onPress={submit} />
 
           <View style={styles.alternateRow}>
             <Text style={styles.alternateText}>Already have an account?</Text>

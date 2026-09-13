@@ -1,32 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { InterestChip } from '@/components/ui/InterestChip';
 import { colors, spacing, typography } from '@/constants/theme';
-import { interests } from '@/data/mock-data';
-import { hasSupabaseConfig } from '@/lib/env';
-import { saveMyInterests } from '@/services/profile';
+import { fetchInterestCatalog, saveMyInterests } from '@/services/profile';
+
+type InterestRow = Awaited<ReturnType<typeof fetchInterestCatalog>>[number];
 
 export default function InterestsScreen() {
-  const [selected, setSelected] = useState<string[]>(['gaming', 'music', 'coffee']);
+  const [interests, setInterests] = useState<InterestRow[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const validSelection = selected.length >= 3 && selected.length <= 6;
 
-  const toggle = (id: string) => {
+  useEffect(() => {
+    let mounted = true;
+    fetchInterestCatalog()
+      .then((rows) => {
+        if (mounted) setInterests(rows);
+      })
+      .catch((cause) => {
+        if (mounted) setError(cause instanceof Error ? cause.message : 'Could not load interests.');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const toggle = (slug: string) => {
     setSelected((current) => {
-      if (current.includes(id)) {
+      if (current.includes(slug)) {
         setError('');
-        return current.filter((x) => x !== id);
+        return current.filter((value) => value !== slug);
       }
       if (current.length >= 6) {
         setError('Choose up to 6 interests.');
         return current;
       }
       setError('');
-      return [...current, id];
+      return [...current, slug];
     });
   };
 
@@ -36,19 +56,16 @@ export default function InterestsScreen() {
       return;
     }
 
-    if (hasSupabaseConfig) {
-      setBusy(true);
-      setError('');
-      try {
-        await saveMyInterests(selected);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not save interests.');
-        setBusy(false);
-        return;
-      }
+    setBusy(true);
+    setError('');
+    try {
+      await saveMyInterests(selected);
+      router.push('/(onboarding)/location');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save interests.');
+    } finally {
       setBusy(false);
     }
-    router.push('/(onboarding)/location');
   };
 
   return (
@@ -59,13 +76,19 @@ export default function InterestsScreen() {
 
       <View style={styles.grid}>
         {interests.map((interest) => (
-          <InterestChip key={interest.id} {...interest} selected={selected.includes(interest.id)} onPress={() => toggle(interest.id)} />
+          <InterestChip
+            key={interest.slug}
+            emoji={interest.emoji || undefined}
+            label={interest.label}
+            selected={selected.includes(interest.slug)}
+            onPress={() => toggle(interest.slug)}
+          />
         ))}
       </View>
 
-      <Text style={styles.count}>{selected.length} selected</Text>
+      <Text style={styles.count}>{loading ? 'Loading interests…' : selected.length + ' selected'}</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <SabaiButton label={busy ? 'Saving...' : 'Set location'} disabled={busy || !validSelection} onPress={next} />
+      <SabaiButton label={busy ? 'Saving...' : 'Set location'} disabled={loading || busy || !validSelection} onPress={next} />
     </Screen>
   );
 }

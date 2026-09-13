@@ -8,14 +8,7 @@ type Destination = {
   address?: string;
 };
 
-const demoDestination: Destination = {
-  latitude: 13.806,
-  longitude: 100.524,
-  name: 'Demo public meeting place',
-  address: 'Destination only — user origins are intentionally hidden',
-};
-
-export function MeetingMap({ destination = demoDestination }: { destination?: Destination }) {
+export function MeetingMap({ destination }: { destination: Destination }) {
   return (
     <View style={styles.frame}>
       <View style={styles.pin}>

@@ -6,11 +6,9 @@ import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { InterestChip } from '@/components/ui/InterestChip';
 import { MatchScoreBadge } from '@/components/ui/MatchScoreBadge';
-import { mockProfiles } from '@/data/mock-data';
 import { calculateMatchScore } from '@/services/matching';
 import { blockProfile, reportProfile } from '@/services/safety';
-import { fetchPublicProfile } from '@/services/profile';
-import { hasSupabaseConfig } from '@/lib/env';
+import { fetchMyProfile, fetchPublicProfile } from '@/services/profile';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import type { UserProfile } from '@/types/domain';
 
@@ -18,18 +16,21 @@ const fallbackAvatar = require('../../../assets/branding/logo-mark.png');
 
 export default function ProfileDetailScreen() {
   const { id, distance } = useLocalSearchParams<{ id: string; distance?: string }>();
-  const mock = mockProfiles.find((item) => item.id === id);
-  const [remote, setRemote] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(Boolean(hasSupabaseConfig && !mock));
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [viewerInterestIds, setViewerInterestIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(Boolean(id));
+  const [error, setError] = useState<string | null>(id ? null : 'Profile id is missing.');
 
   useEffect(() => {
-    if (!hasSupabaseConfig || mock || !id) return;
+    if (!id) return;
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-    fetchPublicProfile(id)
-      .then((row) => {
+    Promise.all([fetchPublicProfile(id), fetchMyProfile()])
+      .then(([row, me]) => {
         if (cancelled) return;
-        setRemote({
+        setProfile({
           id: row.id,
           displayName: row.display_name,
           bio: row.bio,
@@ -43,25 +44,29 @@ export default function ProfileDetailScreen() {
             emoji: interest.emoji || '✨',
           })),
         });
+        setViewerInterestIds(me.interests.map((interest: any) => interest.slug));
       })
-      .catch((error) => {
-        Alert.alert('Could not load profile', error instanceof Error ? error.message : 'Please try again.');
+      .catch((cause) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load profile.');
       })
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    return () => { cancelled = true; };
-  }, [id, distance, mock]);
+    return () => {
+      cancelled = true;
+    };
+  }, [id, distance]);
 
-  const profile = mock ?? remote;
   const score = useMemo(
-    () => profile ? calculateMatchScore(['gaming', 'music', 'coding', 'coffee'], profile).total : 0,
-    [profile],
+    () => profile ? calculateMatchScore(viewerInterestIds, profile).total : 0,
+    [profile, viewerInterestIds],
   );
 
   if (loading || !profile) {
     return (
       <Screen contentStyle={styles.loading}>
-        <Text style={styles.loadingText}>Loading profile…</Text>
+        <Text style={[styles.loadingText, error && styles.errorText]}>{error || 'Loading profile…'}</Text>
         <SabaiButton label="Back" variant="ghost" onPress={() => router.back()} />
       </Screen>
     );
@@ -77,16 +82,13 @@ export default function ProfileDetailScreen() {
           text: 'Block',
           style: 'destructive',
           onPress: async () => {
-            if (hasSupabaseConfig) {
-              try {
-                await blockProfile(profile.id);
-              } catch (error) {
-                Alert.alert('Could not block', error instanceof Error ? error.message : 'Please try again.');
-                return;
-              }
+            try {
+              await blockProfile(profile.id);
+              Alert.alert('Blocked', profile.displayName + ' will no longer appear in your discovery flow.');
+              router.replace('/(tabs)/discover');
+            } catch (cause) {
+              Alert.alert('Could not block', cause instanceof Error ? cause.message : 'Please try again.');
             }
-            Alert.alert('Blocked', profile.displayName + ' will no longer appear in your discovery flow.');
-            router.replace('/(tabs)/discover');
           },
         },
       ],
@@ -103,15 +105,12 @@ export default function ProfileDetailScreen() {
           text: 'Report',
           style: 'destructive',
           onPress: async () => {
-            if (hasSupabaseConfig) {
-              try {
-                await reportProfile(profile.id, 'other');
-              } catch (error) {
-                Alert.alert('Could not report', error instanceof Error ? error.message : 'Please try again.');
-                return;
-              }
+            try {
+              await reportProfile(profile.id, 'other');
+              Alert.alert('Report received', 'Thanks. The report has been recorded.');
+            } catch (cause) {
+              Alert.alert('Could not report', cause instanceof Error ? cause.message : 'Please try again.');
             }
-            Alert.alert('Report received', 'Thanks. The report has been recorded.');
           },
         },
       ],
@@ -136,7 +135,7 @@ export default function ProfileDetailScreen() {
               <Text style={styles.location}>~{profile.distanceKm.toFixed(1)} km · {profile.approximateArea}</Text>
             </View>
           </View>
-          <MatchScoreBadge score={score} />
+          {viewerInterestIds.length ? <MatchScoreBadge score={score} /> : null}
         </View>
 
         <Text style={styles.bio}>{profile.bio}</Text>
@@ -171,7 +170,8 @@ export default function ProfileDetailScreen() {
 const styles = StyleSheet.create({
   screen: { paddingHorizontal: 0, paddingBottom: spacing.xl },
   loading: { alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
-  loadingText: { color: colors.textMuted },
+  loadingText: { color: colors.textMuted, textAlign: 'center' },
+  errorText: { color: colors.danger },
   photo: { width: '100%', height: 260, overflow: 'hidden', position: 'relative', paddingTop: spacing.lg },
   photoImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', backgroundColor: colors.primaryLight },
   backButton: { marginLeft: spacing.lg, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },

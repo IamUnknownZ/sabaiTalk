@@ -1,24 +1,6 @@
 # SabaiTalk Asset Manifest
 
-Primary generated asset source:
-
-`ref/analyze all these/SabaiTalk-generated-assets/sabaitalk_ready/`
-
-The production app consumes copies from `assets/`. Branding, illustrations, places, and decorations are PNG files. Demo/fallback avatars use WebP.
-
-## Avatars
-- `assets/avatars/avatar-01.webp`
-- `assets/avatars/avatar-02.webp`
-- `assets/avatars/avatar-03.webp`
-- `assets/avatars/avatar-04.webp`
-- `assets/avatars/avatar-05.webp`
-- `assets/avatars/avatar-06.webp`
-- `assets/avatars/avatar-07.webp`
-- `assets/avatars/avatar-08.webp`
-- `assets/avatars/avatar-09.webp`
-- `assets/avatars/avatar-10.webp`
-- `assets/avatars/avatar-11.webp`
-- `assets/avatars/avatar-12.webp`
+The runtime app is **real-data-only**. Local assets are branding, UI illustrations, decorations, and place-category artwork only. User profile photos are real uploads stored in Supabase Storage; there are no bundled demo/profile-person avatars in production source.
 
 ## Branding
 - `assets/branding/adaptive-icon.png`
@@ -26,6 +8,8 @@ The production app consumes copies from `assets/`. Branding, illustrations, plac
 - `assets/branding/logo-horizontal.png`
 - `assets/branding/logo-mark.png`
 - `assets/branding/splash-logo.png`
+
+`assets/branding/logo-mark.png` is also the privacy-safe neutral fallback when a real user has not uploaded an avatar.
 
 ## Decorations
 - `assets/decorations/city.png`
@@ -46,7 +30,7 @@ The production app consumes copies from `assets/`. Branding, illustrations, plac
 - `assets/illustrations/no-place-found.png`
 - `assets/illustrations/welcome.png`
 
-## Places
+## Place categories
 - `assets/places/cafe.png`
 - `assets/places/cinema.png`
 - `assets/places/food.png`
@@ -54,8 +38,8 @@ The production app consumes copies from `assets/`. Branding, illustrations, plac
 - `assets/places/park.png`
 - `assets/places/study.png`
 
-## Integration notes
-- Expo app icon, adaptive icon, splash image, and in-app logo references already point at `assets/branding/`.
-- Existing illustration/place references keep the same filenames, so replacing the production files automatically updates those screens.
-- Avatar references were migrated from the old PNG set to the generated WebP files.
-- The previous generated `sparkles.png` decoration and old PNG avatars were removed from the production asset tree because they are not part of the new `sabaitalk_ready` pack.
+## Runtime avatar policy
+- Real profile photos: Supabase Storage bucket `avatars`.
+- Profile row stores the resulting `avatar_url`.
+- No local fictional-person avatar is used as user data.
+- If a real user has no avatar, the app shows the SabaiTalk logo mark.

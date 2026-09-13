@@ -19,7 +19,7 @@ export default function LoginScreen() {
 
   const submit = async () => {
     if (!hasSupabaseConfig) {
-      router.replace('/(tabs)/discover');
+      setError('Supabase is not configured. Add the real client URL and anon key to .env.local.');
       return;
     }
 
@@ -29,8 +29,8 @@ export default function LoginScreen() {
       const { error: authError } = await signInWithEmail(email, password);
       if (authError) throw authError;
       router.replace('/(tabs)/discover');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not log in.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not log in.');
     } finally {
       setBusy(false);
     }
@@ -106,7 +106,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.actions}>
-          <SabaiButton label={!hasSupabaseConfig ? 'Continue in demo' : busy ? 'Logging in...' : 'Log in'} disabled={busy} onPress={submit} />
+          <SabaiButton label={busy ? 'Logging in...' : 'Log in'} disabled={busy} onPress={submit} />
 
           <View style={styles.alternateRow}>
             <Text style={styles.alternateText}>New to SabaiTalk?</Text>

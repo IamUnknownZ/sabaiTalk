@@ -105,6 +105,9 @@ const viewports = [
   { name: '1440x900', width: 1440, height: 900, mobile: false },
 ];
 
+const qaUserId = '00000000-0000-0000-0000-000000000001';
+const qaMatchId = '00000000-0000-0000-0000-000000000002';
+
 const routes = [
   '/',
   '/login',
@@ -116,10 +119,10 @@ const routes = [
   '/matches',
   '/chats',
   '/profile',
-  '/profile/demo-ton',
-  '/chat/demo-ton',
-  '/match/demo-match?profileId=demo-ton&name=Ton',
-  '/meeting/demo-ton',
+  `/profile/${qaUserId}`,
+  `/chat/${qaUserId}?matchId=${qaMatchId}&name=QA`,
+  `/match/${qaMatchId}?profileId=${qaUserId}&name=QA`,
+  `/meeting/${qaUserId}?matchId=${qaMatchId}&name=QA`,
 ];
 
 const visualRoutes = new Set([
@@ -127,9 +130,9 @@ const visualRoutes = new Set([
   '/register',
   '/discover',
   '/profile',
-  '/profile/demo-ton',
-  '/match/demo-match?profileId=demo-ton&name=Ton',
-  '/meeting/demo-ton',
+  `/profile/${qaUserId}`,
+  `/match/${qaMatchId}?profileId=${qaUserId}&name=QA`,
+  `/meeting/${qaUserId}?matchId=${qaMatchId}&name=QA`,
 ]);
 
 const failures = [];

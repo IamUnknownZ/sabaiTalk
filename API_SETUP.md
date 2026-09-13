@@ -102,6 +102,14 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
 ### Security
 Use platform/API restrictions appropriate to the final Android/iOS app. Do not reuse an unrestricted server key.
 
+The permanent Android package is:
+
+```text
+com.iamunknownz.sabaitalk
+```
+
+Restrict the Android Maps key to this package plus the SHA-1 fingerprint of the signing certificate used by the installed build.
+
 ### User action when requested
 Detailed instructions should cover:
 - enabling required Maps SDK,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,73 +6,53 @@ import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { InterestChip } from '@/components/ui/InterestChip';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { interests } from '@/data/mock-data';
-import { hasSupabaseConfig } from '@/lib/env';
-import { clearDemoState } from '@/lib/demo-state';
 import { pickAndUploadAvatar } from '@/services/avatar';
 import { signOut } from '@/services/auth';
-import { fetchMyProfile } from '@/services/profile';
+import { useMyProfile } from '@/hooks/use-my-profile';
 import { useMyMatches } from '@/hooks/use-my-matches';
+
+const placeholderAvatar = require('../../../assets/branding/logo-mark.png');
 
 export default function MyProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [liveProfile, setLiveProfile] = useState<Awaited<ReturnType<typeof fetchMyProfile>> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const { profile, loading, error, reload } = useMyProfile();
   const { rows: matchRows } = useMyMatches();
 
-  useEffect(() => {
-    if (!hasSupabaseConfig) return;
-    let cancelled = false;
-    fetchMyProfile()
-      .then((profile) => { if (!cancelled) setLiveProfile(profile); })
-      .catch((error) => {
-        if (!cancelled) Alert.alert('Could not load profile', error instanceof Error ? error.message : 'Please try again.');
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const demoAvatar = require('../../../assets/avatars/avatar-05.webp');
-  const placeholderAvatar = require('../../../assets/branding/logo-mark.png');
   const avatar = avatarUrl
     ? { uri: avatarUrl }
-    : liveProfile?.avatar_url
-      ? { uri: liveProfile.avatar_url }
-      : hasSupabaseConfig ? placeholderAvatar : demoAvatar;
-  const displayName = hasSupabaseConfig ? liveProfile?.display_name ?? 'Loading profile…' : 'Your profile';
-  const areaLabel = liveProfile?.approximate_area ? liveProfile.approximate_area : 'Approximate area only';
-  const profileInterests = hasSupabaseConfig ? liveProfile?.interests ?? [] : interests.slice(0, 4);
-  const matchCount = hasSupabaseConfig ? matchRows.length : 3;
+    : profile?.avatar_url
+      ? { uri: profile.avatar_url }
+      : placeholderAvatar;
+  const displayName = loading ? 'Loading profile…' : profile?.display_name ?? 'Profile unavailable';
+  const areaLabel = profile?.approximate_area || 'Approximate area only';
+  const profileInterests = profile?.interests ?? [];
 
   const exit = async () => {
     if (exiting) return;
     setExiting(true);
     try {
-      await clearDemoState();
-      if (hasSupabaseConfig) {
-        const { error } = await signOut();
-        if (error) throw error;
-      }
+      const { error: signOutError } = await signOut();
+      if (signOutError) throw signOutError;
       router.replace('/(auth)/login');
-    } catch (error) {
-      Alert.alert('Could not sign out', error instanceof Error ? error.message : 'Please try again.');
+    } catch (cause) {
+      Alert.alert('Could not sign out', cause instanceof Error ? cause.message : 'Please try again.');
     } finally {
       setExiting(false);
     }
   };
 
   const changeAvatar = async () => {
-    if (!hasSupabaseConfig) {
-      Alert.alert('Demo mode', 'Avatar upload will become live after Supabase is configured.');
-      return;
-    }
-
     setUploading(true);
     try {
       const url = await pickAndUploadAvatar();
-      if (url) setAvatarUrl(url);
-    } catch (error) {
-      Alert.alert('Could not update avatar', error instanceof Error ? error.message : 'Please try again.');
+      if (url) {
+        setAvatarUrl(url);
+        await reload();
+      }
+    } catch (cause) {
+      Alert.alert('Could not update avatar', cause instanceof Error ? cause.message : 'Please try again.');
     } finally {
       setUploading(false);
     }
@@ -85,7 +65,7 @@ export default function MyProfileScreen() {
         <Pressable
           style={styles.cameraButton}
           onPress={changeAvatar}
-          disabled={uploading}
+          disabled={uploading || Boolean(error)}
           accessibilityLabel="Change avatar">
           <Ionicons name={uploading ? 'hourglass-outline' : 'camera-outline'} size={20} color={colors.navy} />
         </Pressable>
@@ -100,6 +80,8 @@ export default function MyProfileScreen() {
           </View>
         </View>
 
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
         <View style={styles.stats}>
           <View style={styles.stat}>
             <Text style={styles.statValue}>5 km</Text>
@@ -112,7 +94,7 @@ export default function MyProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{matchCount}</Text>
+            <Text style={styles.statValue}>{matchRows.length}</Text>
             <Text style={styles.statLabel}>Matches</Text>
           </View>
         </View>
@@ -120,7 +102,9 @@ export default function MyProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
           <View style={styles.interests}>
-            {profileInterests.map((interest) => <InterestChip key={'id' in interest ? interest.id : interest.slug} emoji={interest.emoji || undefined} label={interest.label} selected />)}
+            {profileInterests.map((interest) => (
+              <InterestChip key={interest.slug} emoji={interest.emoji || undefined} label={interest.label} selected />
+            ))}
           </View>
         </View>
 
@@ -130,9 +114,9 @@ export default function MyProfileScreen() {
         </View>
 
         <View style={styles.actions}>
-          <SabaiButton label="Edit profile" onPress={() => router.push('/(onboarding)/profile-setup')} />
+          <SabaiButton label="Edit profile" disabled={Boolean(error)} onPress={() => router.push('/(onboarding)/profile-setup')} />
           <Pressable onPress={exit} disabled={exiting} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>{exiting ? 'Exiting…' : 'Log out / Exit demo'}</Text>
+            <Text style={styles.logoutText}>{exiting ? 'Logging out…' : 'Log out'}</Text>
           </Pressable>
         </View>
       </View>
@@ -160,6 +144,7 @@ const styles = StyleSheet.create({
   name: { color: colors.navy, fontSize: typography.title, fontWeight: '700' },
   areaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
   area: { color: colors.textMuted, fontSize: 12 },
+  error: { color: colors.danger, fontSize: 12, lineHeight: 18, marginTop: spacing.md },
   stats: {
     flexDirection: 'row',
     alignItems: 'stretch',

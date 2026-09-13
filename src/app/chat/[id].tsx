@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -6,11 +6,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { IllustratedEmptyState } from '@/components/ui/IllustratedEmptyState';
-import { mockProfiles } from '@/data/mock-data';
 import { colors, spacing, typography } from '@/constants/theme';
-import { hasSupabaseConfig } from '@/lib/env';
 import { requireSupabase } from '@/lib/supabase';
-import { getDemoMessages, saveDemoMessages, type DemoChatMessage } from '@/lib/demo-state';
+import { fetchPublicProfile } from '@/services/profile';
 import { listMessages, sendMessage, subscribeToMessages } from '@/services/messages';
 
 type LiveMessage = {
@@ -22,53 +20,53 @@ type LiveMessage = {
 
 const fallbackAvatar = require('../../../assets/branding/logo-mark.png');
 
-function seedDemoMessages(): DemoChatMessage[] {
-  return [
-    { id: 'demo-seed-1', sender_id: 'demo-them', content: 'Hey! I saw we both like the same stuff 👋', created_at: new Date(0).toISOString() },
-    { id: 'demo-seed-2', sender_id: 'demo-me', content: 'Yep 😄 Want to find somewhere public halfway?', created_at: new Date(1).toISOString() },
-  ];
-}
-
 export default function ChatScreen() {
   const { id, matchId, name } = useLocalSearchParams<{ id: string; matchId?: string; name?: string }>();
-  const profile = mockProfiles.find((item) => item.id === id);
-  const displayName = profile?.displayName || name || 'Match';
-  const distance = profile?.distanceKm;
-  const live = Boolean(hasSupabaseConfig && matchId);
   const scrollRef = useRef<ScrollView>(null);
 
   const [value, setValue] = useState('');
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
-  const demoProfileId = id || 'demo-match';
-
-  const visibleMessages = useMemo(
-    () => live ? messages : messages.length ? messages : seedDemoMessages(),
-    [live, messages],
-  );
+  const [profileName, setProfileName] = useState(name || 'Match');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(Boolean(matchId));
+  const [error, setError] = useState<string | null>(matchId ? null : 'Open a chat from an active match.');
 
   useEffect(() => {
-    if (live) return;
+    if (!id) return;
     let mounted = true;
-    void getDemoMessages(demoProfileId).then((stored) => {
-      if (mounted) setMessages(stored.length ? stored : seedDemoMessages());
-    });
-    return () => { mounted = false; };
-  }, [demoProfileId, live]);
+
+    fetchPublicProfile(id)
+      .then((profile) => {
+        if (!mounted) return;
+        setProfileName(profile.display_name || name || 'Match');
+        setAvatarUrl(profile.avatar_url);
+      })
+      .catch(() => {
+        // Chat membership/messages are authoritative. Header can safely use route data.
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [id, name]);
 
   useEffect(() => {
-    if (!live || !matchId) return;
+    if (!matchId) return;
 
     let mounted = true;
     let unsubscribe = () => {};
+    setLoading(true);
+    setError(null);
 
-    void requireSupabase().auth.getSession().then(({ data }) => {
-      if (mounted) setMyId(data.session?.user.id ?? null);
-    });
-
-    void listMessages(matchId)
-      .then((rows) => {
+    Promise.resolve()
+      .then(() => Promise.all([
+        requireSupabase().auth.getSession(),
+        listMessages(matchId),
+      ]))
+      .then(([sessionResult, rows]) => {
         if (!mounted) return;
+        setMyId(sessionResult.data.session?.user.id ?? null);
         setMessages(rows as LiveMessage[]);
         unsubscribe = subscribeToMessages(matchId, (message) => {
           if (!mounted) return;
@@ -77,30 +75,23 @@ export default function ChatScreen() {
             : [...current, message as LiveMessage]);
         });
       })
-      .catch((error) => {
-        if (mounted) Alert.alert('Could not load chat', error instanceof Error ? error.message : 'Please try again.');
+      .catch((cause) => {
+        if (!mounted) return;
+        setError(cause instanceof Error ? cause.message : 'Could not load chat.');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
       });
 
     return () => {
       mounted = false;
       unsubscribe();
     };
-  }, [live, matchId]);
+  }, [matchId]);
 
   const send = async () => {
     const content = value.trim();
-    if (!content) return;
-
-    if (!live || !matchId) {
-      const next: DemoChatMessage[] = [
-        ...(visibleMessages as DemoChatMessage[]),
-        { id: 'demo-me-' + Date.now(), sender_id: 'demo-me', content, created_at: new Date().toISOString() },
-      ];
-      setMessages(next);
-      setValue('');
-      await saveDemoMessages(demoProfileId, next);
-      return;
-    }
+    if (!content || !matchId || error) return;
 
     const optimistic: LiveMessage = {
       id: 'temp-' + Date.now(),
@@ -119,10 +110,10 @@ export default function ChatScreen() {
         if (!sent || withoutOptimistic.some((item) => item.id === sent.id)) return withoutOptimistic;
         return [...withoutOptimistic, sent as LiveMessage];
       });
-    } catch (error) {
+    } catch (cause) {
       setMessages((current) => current.filter((item) => item.id !== optimistic.id));
       setValue(content);
-      Alert.alert('Could not send message', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert('Could not send message', cause instanceof Error ? cause.message : 'Please try again.');
     }
   };
 
@@ -136,12 +127,14 @@ export default function ChatScreen() {
           <Pressable onPress={() => router.back()} style={styles.back}>
             <Ionicons name="chevron-back" size={28} color={colors.primaryStrong} />
           </Pressable>
-          <Image source={profile?.avatar || fallbackAvatar} style={styles.avatar} resizeMode="cover" />
+          <Image source={avatarUrl ? { uri: avatarUrl } : fallbackAvatar} style={styles.avatar} resizeMode="cover" />
           <View style={styles.headerCopy}>
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.status}>{live ? 'Realtime chat' : distance ? '~' + distance.toFixed(1) + ' km away • demo' : 'Demo chat'}</Text>
+            <Text style={styles.name}>{profileName}</Text>
+            <Text style={styles.status}>{loading ? 'Loading…' : error ? 'Chat unavailable' : 'Realtime chat'}</Text>
           </View>
         </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <ScrollView
           ref={scrollRef}
@@ -150,8 +143,8 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-          {visibleMessages.map((message, index) => {
-            const mine = live ? message.sender_id === myId : message.sender_id === 'demo-me';
+          {messages.map((message, index) => {
+            const mine = message.sender_id === myId;
             return (
               <Animated.View
                 key={String(message.id)}
@@ -161,7 +154,7 @@ export default function ChatScreen() {
               </Animated.View>
             );
           })}
-          {live && !visibleMessages.length ? (
+          {!loading && !error && !messages.length ? (
             <IllustratedEmptyState
               image={require('../../../assets/illustrations/empty-chat.png')}
               title="Say hi"
@@ -173,7 +166,8 @@ export default function ChatScreen() {
         <SabaiButton
           label="Find a fair place"
           variant="secondary"
-          onPress={() => router.push({ pathname: '/meeting/[id]', params: { id, matchId: matchId || '', name: displayName } })}
+          disabled={!matchId || Boolean(error)}
+          onPress={() => router.push({ pathname: '/meeting/[id]', params: { id, matchId: matchId || '', name: profileName } })}
         />
 
         <View style={styles.composer}>
@@ -185,10 +179,11 @@ export default function ChatScreen() {
             onSubmitEditing={send}
             returnKeyType="send"
             blurOnSubmit={false}
+            editable={Boolean(matchId) && !error}
             style={styles.input}
           />
-          <Pressable style={styles.send} onPress={send} accessibilityLabel="Send message">
-            <Ionicons name="send" size={20} color={value.trim() ? colors.primaryStrong : colors.textMuted} />
+          <Pressable style={styles.send} onPress={send} disabled={!matchId || Boolean(error)} accessibilityLabel="Send message">
+            <Ionicons name="send" size={20} color={value.trim() && !error ? colors.primaryStrong : colors.textMuted} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -205,6 +200,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   name: { color: colors.text, fontSize: typography.heading, fontWeight: '500' },
   status: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  error: { color: colors.danger, fontSize: 12, lineHeight: 18, paddingVertical: spacing.sm },
   messages: { flex: 1 },
   messagesContent: { paddingVertical: spacing.lg },
   bubble: { maxWidth: '78%', paddingHorizontal: spacing.lg, paddingVertical: 11, marginBottom: spacing.sm },

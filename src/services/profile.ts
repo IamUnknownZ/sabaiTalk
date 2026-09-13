@@ -23,6 +23,16 @@ export async function upsertMyProfile(input: { displayName: string; bio: string;
   if (error) throw error;
 }
 
+export async function fetchInterestCatalog() {
+  const { data, error } = await requireSupabase()
+    .from('interests')
+    .select('slug,label,emoji')
+    .order('label', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as { slug: string; label: string; emoji: string | null }[];
+}
+
 export async function saveMyInterests(slugs: string[]) {
   const client = requireSupabase();
   const userId = await currentUserId();
@@ -33,6 +43,9 @@ export async function saveMyInterests(slugs: string[]) {
     .in('slug', slugs);
 
   if (lookupError) throw lookupError;
+  if ((rows ?? []).length !== slugs.length) {
+    throw new Error('One or more selected interests are unavailable.');
+  }
 
   const { error: deleteError } = await client
     .from('user_interests')
@@ -40,11 +53,10 @@ export async function saveMyInterests(slugs: string[]) {
     .eq('user_id', userId);
 
   if (deleteError) throw deleteError;
-  if (!rows?.length) return;
 
   const { error: insertError } = await client
     .from('user_interests')
-    .insert(rows.map((row) => ({ user_id: userId, interest_id: row.id })));
+    .insert((rows ?? []).map((row) => ({ user_id: userId, interest_id: row.id })));
 
   if (insertError) throw insertError;
 }

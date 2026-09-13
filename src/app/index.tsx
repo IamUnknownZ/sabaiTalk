@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
-import { hasSupabaseConfig } from '@/lib/env';
 
 export default function WelcomeScreen() {
   return (
@@ -21,7 +20,6 @@ export default function WelcomeScreen() {
 
       <View style={styles.actions}>
         <SabaiButton label="Get started" onPress={() => router.push('/(auth)/login')} />
-        {!hasSupabaseConfig ? <SabaiButton label="Preview demo" variant="ghost" onPress={() => router.replace('/(tabs)/discover')} /> : null}
       </View>
     </Screen>
   );

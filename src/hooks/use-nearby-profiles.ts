@@ -1,26 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { UserProfile } from '@/types/domain';
-import { mockProfiles } from '@/data/mock-data';
-import { hasSupabaseConfig } from '@/lib/env';
 import { fetchNearbyProfiles } from '@/services/social';
 
 const fallbackAvatar = require('../../assets/branding/logo-mark.png');
 
 export function useNearbyProfiles(radiusKm: number) {
-  const [profiles, setProfiles] = useState<UserProfile[]>(hasSupabaseConfig ? [] : mockProfiles.filter((item) => item.distanceKm <= radiusKm));
-  const [loading, setLoading] = useState(false);
-  const [usingDemo, setUsingDemo] = useState(!hasSupabaseConfig);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    if (!hasSupabaseConfig) {
-      setProfiles(mockProfiles.filter((item) => item.distanceKm <= radiusKm));
-      setUsingDemo(true);
-      return;
-    }
-
     setLoading(true);
+    setError(null);
+
     fetchNearbyProfiles(radiusKm)
       .then((rows) => {
         if (cancelled) return;
@@ -38,19 +31,20 @@ export function useNearbyProfiles(radiusKm: number) {
             emoji: interest.emoji || '✨',
           })),
         })));
-        setUsingDemo(false);
       })
-      .catch(() => {
+      .catch((cause) => {
         if (cancelled) return;
         setProfiles([]);
-        setUsingDemo(false);
+        setError(cause instanceof Error ? cause.message : 'Could not load nearby profiles.');
       })
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
       cancelled = true;
     };
   }, [radiusKm]);
 
-  return { profiles, loading, usingDemo };
+  return { profiles, loading, error };
 }

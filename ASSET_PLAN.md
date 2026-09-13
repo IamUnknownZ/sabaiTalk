@@ -77,17 +77,13 @@ Destination: `assets/states/`
 
 Do not bake error text into images; UI supplies localized copy.
 
-### 4. Demo avatars
-Destination: `assets/avatars/`
+### 4. Runtime profile avatars
 
-Create 12 fictional adult portraits:
-- `demo-01.png` … `demo-12.png`
-- diverse appearances and hairstyles
-- all clearly adult
-- friendly casual/student/young-professional styling
-- consistent illustration style
-- square/circular-safe framing
-- no real people / celebrities
+Production runtime does not bundle fictional profile people. User avatars are real uploads stored in Supabase Storage.
+
+- No `assets/avatars/` demo set is required.
+- Missing real avatars use the neutral SabaiTalk `assets/branding/logo-mark.png` fallback.
+- UI/QA must not fabricate a user identity when backend data is unavailable.
 
 ### 5. Place category assets
 Destination: `assets/places/`
@@ -123,11 +119,11 @@ These should support compositing without forcing a fixed screen composition.
 - Branding: 4
 - Core illustrations: 4
 - State illustrations: 6
-- Demo avatars: 12
+- Runtime profile avatars: Supabase user uploads (no bundled demo set)
 - Place assets: 6
 - Decor: 6
 
-**Total: 38 production PNG assets**
+**Local production artwork excludes user profile photos; those are runtime Supabase uploads.**
 
 ---
 

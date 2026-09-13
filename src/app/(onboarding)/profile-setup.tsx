@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
-import { hasSupabaseConfig } from '@/lib/env';
 import { upsertMyProfile } from '@/services/profile';
 
 export default function ProfileSetupScreen() {
@@ -20,25 +19,22 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    if (hasSupabaseConfig) {
-      setBusy(true);
-      setError('');
-      try {
-        await upsertMyProfile({ displayName: name.trim(), bio: bio.trim() });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not save profile.');
-        setBusy(false);
-        return;
-      }
+    setBusy(true);
+    setError('');
+    try {
+      await upsertMyProfile({ displayName: name.trim(), bio: bio.trim() });
+      router.push('/(onboarding)/interests');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save profile.');
+    } finally {
       setBusy(false);
     }
-    router.push('/(onboarding)/interests');
   };
 
   return (
     <Screen scroll contentStyle={styles.screen}>
       <Text style={styles.step}>1 / 3</Text>
-      <Image source={require('../../../assets/avatars/avatar-01.webp')} style={styles.avatar} resizeMode="cover" />
+      <Image source={require('../../../assets/branding/logo-mark.png')} style={styles.avatar} resizeMode="contain" />
       <Text style={styles.title}>Make it feel like you</Text>
 
       <View style={styles.form}>
@@ -67,7 +63,7 @@ export default function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   screen: { paddingTop: spacing.xl, paddingBottom: spacing.xl },
   step: { color: colors.primaryStrong, fontWeight: '700', textAlign: 'center' },
-  avatar: { width: 118, height: 118, borderRadius: 59, alignSelf: 'center', marginTop: spacing.xl },
+  avatar: { width: 118, height: 118, borderRadius: 59, alignSelf: 'center', marginTop: spacing.xl, backgroundColor: colors.primaryLight },
   title: { color: colors.text, fontSize: typography.title, fontWeight: '700', textAlign: 'center', marginTop: spacing.lg },
   form: { marginTop: spacing.xl, gap: spacing.sm },
   label: { color: colors.primaryStrong, textAlign: 'center', fontWeight: '700', marginTop: spacing.sm },

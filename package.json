@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint",
-    "qa:web": "node scripts/qa-web.mjs"
+    "qa:web": "node scripts/qa-web.mjs",
+    "qa:backend": "node scripts/qa-backend-local.mjs"
   },
   "dependencies": {
     "@expo/ui": "~0.2.0-beta.9",
