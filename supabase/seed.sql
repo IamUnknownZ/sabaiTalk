@@ -1,0 +1,2 @@
+-- SabaiTalk local acceptance tests create their own temporary tester accounts/data.
+-- Keep this seed free of fake user activity.

@@ -1,0 +1,200 @@
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import { Screen } from '@/components/ui/Screen';
+import { ProfileCard } from '@/components/ProfileCard';
+import { NearbyRadar } from '@/components/NearbyRadar';
+import { IllustratedEmptyState } from '@/components/ui/IllustratedEmptyState';
+import { colors, radius, shadow, spacing } from '@/constants/theme';
+import { useNearbyProfiles } from '@/hooks/use-nearby-profiles';
+import { getDemoActedProfileIds, saveDemoActedProfileIds } from '@/lib/demo-state';
+import { likeProfile, passProfile } from '@/services/social';
+
+const viewerInterests = ['gaming', 'music', 'coding', 'coffee'];
+
+export default function DiscoverScreen() {
+  const [mode, setMode] = useState<'cards' | 'nearby'>('nearby');
+  const [radiusKm, setRadiusKm] = useState(5);
+  const [actedIds, setActedIds] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [acting, setActing] = useState(false);
+  const { profiles: candidates, loading, usingDemo } = useNearbyProfiles(radiusKm);
+
+  useEffect(() => {
+    if (!usingDemo) return;
+    let mounted = true;
+    void getDemoActedProfileIds().then((ids) => {
+      if (mounted) setActedIds(ids);
+    });
+    return () => { mounted = false; };
+  }, [usingDemo]);
+
+  const available = useMemo(
+    () => candidates.filter((profile) => !actedIds.includes(profile.id)),
+    [actedIds, candidates],
+  );
+  const current = available[0];
+  const selected = available.find((profile) => profile.id === selectedId);
+  const target = mode === 'nearby' ? selected : current;
+
+  const markActed = async (profileId: string) => {
+    const next = [...new Set([...actedIds, profileId])];
+    setActedIds(next);
+    if (selectedId === profileId) setSelectedId(null);
+    if (usingDemo) await saveDemoActedProfileIds(next);
+  };
+
+  const like = async (): Promise<boolean> => {
+    if (!target || acting) return false;
+    if (usingDemo) {
+      await markActed(target.id);
+      return true;
+    }
+
+    setActing(true);
+    try {
+      const matchId = await likeProfile(target.id);
+      await markActed(target.id);
+      if (matchId) {
+        router.push({ pathname: '/match/[id]', params: { id: matchId, profileId: target.id, name: target.displayName } });
+      }
+      return true;
+    } catch (error) {
+      Alert.alert('Could not like profile', error instanceof Error ? error.message : 'Please try again.');
+      return false;
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const pass = async (): Promise<boolean> => {
+    if (!target || acting) return false;
+    if (usingDemo) {
+      await markActed(target.id);
+      return true;
+    }
+
+    setActing(true);
+    try {
+      await passProfile(target.id);
+      await markActed(target.id);
+      return true;
+    } catch (error) {
+      Alert.alert('Could not pass profile', error instanceof Error ? error.message : 'Please try again.');
+      return false;
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const openProfile = () => {
+    if (!target) return;
+    router.push({ pathname: '/profile/[id]', params: { id: target.id, distance: String(target.distanceKm) } });
+  };
+
+  return (
+    <Screen scroll contentStyle={styles.screen}>
+      <View style={styles.top}>
+        <Pressable style={styles.utility}>
+          <Ionicons name="location" size={15} color={colors.primaryStrong} />
+          <Text style={styles.utilityText}>{radiusKm} km</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.utility}
+          onPress={() => {
+            setSelectedId(null);
+            setMode((value) => value === 'cards' ? 'nearby' : 'cards');
+          }}>
+          <Ionicons name={mode === 'cards' ? 'grid-outline' : 'albums-outline'} size={15} color={colors.primaryStrong} />
+          <Text style={styles.utilityText}>{mode === 'cards' ? 'Radar' : 'Cards'}</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.radiusRow}>
+        {[1, 3, 5, 10].map((km) => (
+          <Pressable key={km} onPress={() => { setRadiusKm(km); setSelectedId(null); }} style={styles.radiusOption}>
+            <Text style={[styles.radiusText, radiusKm === km && styles.radiusTextActive]}>{km} km</Text>
+            {radiusKm === km ? <View style={styles.radiusDot} /> : null}
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.counter}>
+        {loading ? 'Loading…' : mode === 'nearby' ? available.length + ' nearby • tap a person' : available.length + ' profiles left • swipe or tap'}
+      </Text>
+
+      {mode === 'nearby' ? (
+        available.length ? (
+          <>
+            <NearbyRadar profiles={available} radiusKm={radiusKm} onSelect={(profile) => setSelectedId(profile.id)} />
+            {selected ? (
+              <Animated.View
+                key={selected.id}
+                entering={FadeInDown.duration(240)}
+                exiting={FadeOutDown.duration(180)}>
+                <ProfileCard
+                  compact
+                  disabled={acting}
+                  profile={selected}
+                  viewerInterestIds={viewerInterests}
+                  onLike={like}
+                  onPass={pass}
+                  onOpen={openProfile}
+                />
+              </Animated.View>
+            ) : null}
+          </>
+        ) : (
+          <IllustratedEmptyState
+            image={require('../../../assets/illustrations/empty-nearby.png')}
+            title="You’re caught up"
+            body={radiusKm < 10 ? 'You’ve decided on everyone here. Try a wider range.' : 'You’ve reached the end of the current demo feed.'}
+            actionLabel={radiusKm < 10 ? 'Use 10 km' : undefined}
+            onAction={radiusKm < 10 ? () => setRadiusKm(10) : undefined}
+          />
+        )
+      ) : current ? (
+        <Animated.View
+          key={current.id}
+          entering={FadeInDown.duration(240)}
+          exiting={FadeOutDown.duration(180)}>
+          <ProfileCard
+            disabled={acting}
+            profile={current}
+            viewerInterestIds={viewerInterests}
+            onLike={like}
+            onPass={pass}
+            onOpen={openProfile}
+          />
+        </Animated.View>
+      ) : (
+        <IllustratedEmptyState
+          image={require('../../../assets/illustrations/empty-nearby.png')}
+          title="You’re caught up"
+          body={radiusKm < 10 ? 'You’ve decided on everyone here. Try a wider range.' : 'You’ve reached the end of the current demo feed.'}
+          actionLabel={radiusKm < 10 ? 'Use 10 km' : undefined}
+          onAction={radiusKm < 10 ? () => setRadiusKm(10) : undefined}
+        />
+      )}
+
+      {acting ? <Text style={styles.working}>Saving…</Text> : null}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { paddingTop: spacing.md, paddingBottom: 88 },
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  utility: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.pill, ...shadow },
+  utilityText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  radiusRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  radiusOption: { alignItems: 'center', paddingVertical: spacing.sm, minWidth: 54 },
+  radiusText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  radiusTextActive: { color: colors.primaryStrong },
+  radiusDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primaryStrong, marginTop: 4 },
+  counter: { color: colors.textMuted, fontSize: 11, textAlign: 'center', marginBottom: spacing.sm },
+  working: { color: colors.textMuted, textAlign: 'center', fontSize: 12, marginTop: spacing.sm },
+});

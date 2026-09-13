@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "SabaiTalk",
+    "slug": "sabaitalk",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "sabaitalk",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/branding/app-icon.png",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5FAFD",
+        "foregroundImage": "./assets/branding/adaptive-icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5FAFD",
+          "image": "./assets/branding/splash-logo.png",
+          "imageWidth": 180
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
