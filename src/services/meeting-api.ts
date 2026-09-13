@@ -1,4 +1,5 @@
 import { requireSupabase } from '@/lib/supabase';
+import { assertUuid } from '@/lib/validation';
 import type { MeetingCategory } from '@/types/domain';
 
 export type MeetingRecommendation = {
@@ -16,9 +17,14 @@ export type MeetingRecommendation = {
   totalMinutes: number;
 };
 
+const meetingCategories = new Set<MeetingCategory>(['cafe', 'food', 'park', 'mall', 'cinema', 'study']);
+
 export async function fetchMeetingRecommendations(matchId: string, category: MeetingCategory) {
+  const safeMatchId = assertUuid(matchId, 'match id');
+  if (!meetingCategories.has(category)) throw new Error('Invalid meeting category.');
+
   const { data, error } = await requireSupabase().functions.invoke('meeting-recommendations', {
-    body: { matchId, category },
+    body: { matchId: safeMatchId, category },
   });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);

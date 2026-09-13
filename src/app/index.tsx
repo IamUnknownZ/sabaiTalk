@@ -1,10 +1,18 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { GuardError, GuardLoading } from '@/components/GuardState';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
+import { onboardingStagePath, useAuthSession } from '@/providers/AuthSessionProvider';
 
 export default function WelcomeScreen() {
+  const { session, authReady, stage, stageReady, error } = useAuthSession();
+
+  if (!authReady || (session && !stageReady)) return <GuardLoading />;
+  if (session && error) return <GuardError />;
+  if (session && stage) return <Redirect href={onboardingStagePath(stage)} />;
+
   return (
     <Screen scroll contentStyle={styles.screen}>
       <Image source={require('../../assets/branding/logo-horizontal.png')} style={styles.logo} resizeMode="contain" />

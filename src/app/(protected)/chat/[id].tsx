@@ -18,7 +18,7 @@ type LiveMessage = {
   created_at?: string;
 };
 
-const fallbackAvatar = require('../../../assets/branding/logo-mark.png');
+const fallbackAvatar = require('../../../../assets/branding/logo-mark.png');
 
 export default function ChatScreen() {
   const { id, matchId, name } = useLocalSearchParams<{ id: string; matchId?: string; name?: string }>();
@@ -156,7 +156,7 @@ export default function ChatScreen() {
           })}
           {!loading && !error && !messages.length ? (
             <IllustratedEmptyState
-              image={require('../../../assets/illustrations/empty-chat.png')}
+              image={require('../../../../assets/illustrations/empty-chat.png')}
               title="Say hi"
               body="You already matched. Start the conversation when you’re ready."
             />

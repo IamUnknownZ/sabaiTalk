@@ -28,7 +28,7 @@ export default function LoginScreen() {
     try {
       const { error: authError } = await signInWithEmail(email, password);
       if (authError) throw authError;
-      router.replace('/(tabs)/discover');
+      // AuthLayout redirects according to the server-verified onboarding state.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not log in.');
     } finally {

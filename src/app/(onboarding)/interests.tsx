@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { InterestChip } from '@/components/ui/InterestChip';
 import { colors, spacing, typography } from '@/constants/theme';
+import { useAuthSession } from '@/providers/AuthSessionProvider';
 import { fetchInterestCatalog, saveMyInterests } from '@/services/profile';
 
 type InterestRow = Awaited<ReturnType<typeof fetchInterestCatalog>>[number];
 
 export default function InterestsScreen() {
+  const { refreshOnboarding } = useAuthSession();
   const [interests, setInterests] = useState<InterestRow[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,8 @@ export default function InterestsScreen() {
     setError('');
     try {
       await saveMyInterests(selected);
-      router.push('/(onboarding)/location');
+      await refreshOnboarding();
+      // The onboarding guard advances to Location from the server-verified status.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save interests.');
     } finally {

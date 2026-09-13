@@ -4,10 +4,12 @@ import { router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
+import { useAuthSession } from '@/providers/AuthSessionProvider';
 import { useCurrentLocation } from '@/hooks/use-current-location';
 import { saveMyLocation } from '@/services/social';
 
 export default function LocationSetupScreen() {
+  const { refreshOnboarding } = useAuthSession();
   const location = useCurrentLocation();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -21,6 +23,7 @@ export default function LocationSetupScreen() {
     setSaving(true);
     try {
       await saveMyLocation(coordinates.latitude, coordinates.longitude);
+      await refreshOnboarding();
       setSaved(true);
     } catch (cause) {
       setSaved(false);

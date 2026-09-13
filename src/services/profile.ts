@@ -1,4 +1,10 @@
 import { requireSupabase } from '@/lib/supabase';
+import {
+  assertUuid,
+  normalizeOptionalText,
+  normalizeRequiredText,
+  validateInterestSlugs,
+} from '@/lib/validation';
 
 async function currentUserId() {
   const client = requireSupabase();
@@ -11,12 +17,15 @@ async function currentUserId() {
 export async function upsertMyProfile(input: { displayName: string; bio: string; approximateArea?: string }) {
   const client = requireSupabase();
   const id = await currentUserId();
+  const displayName = normalizeRequiredText(input.displayName, 'Display name', 60);
+  const bio = normalizeRequiredText(input.bio, 'Bio', 160);
+  const approximateArea = normalizeOptionalText(input.approximateArea, 120);
 
   const { error } = await client.from('profiles').upsert({
     id,
-    display_name: input.displayName.trim(),
-    bio: input.bio.trim(),
-    approximate_area: input.approximateArea ?? null,
+    display_name: displayName,
+    bio,
+    approximate_area: approximateArea,
     updated_at: new Date().toISOString(),
   });
 
@@ -34,31 +43,24 @@ export async function fetchInterestCatalog() {
 }
 
 export async function saveMyInterests(slugs: string[]) {
-  const client = requireSupabase();
-  const userId = await currentUserId();
+  const selectedSlugs = validateInterestSlugs(slugs);
+  const { error } = await requireSupabase().rpc('set_my_interests', {
+    selected_slugs: selectedSlugs,
+  });
+  if (error) throw error;
+}
 
-  const { data: rows, error: lookupError } = await client
-    .from('interests')
-    .select('id,slug')
-    .in('slug', slugs);
+export async function getMyOnboardingStatus() {
+  const { data, error } = await requireSupabase().rpc('my_onboarding_status');
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error('Could not verify onboarding status.');
 
-  if (lookupError) throw lookupError;
-  if ((rows ?? []).length !== slugs.length) {
-    throw new Error('One or more selected interests are unavailable.');
-  }
-
-  const { error: deleteError } = await client
-    .from('user_interests')
-    .delete()
-    .eq('user_id', userId);
-
-  if (deleteError) throw deleteError;
-
-  const { error: insertError } = await client
-    .from('user_interests')
-    .insert((rows ?? []).map((row) => ({ user_id: userId, interest_id: row.id })));
-
-  if (insertError) throw insertError;
+  return {
+    profileComplete: Boolean(row.profile_complete),
+    interestCount: Number(row.interest_count ?? 0),
+    hasLocation: Boolean(row.has_location),
+  };
 }
 
 export async function fetchMyProfile() {
@@ -66,12 +68,13 @@ export async function fetchMyProfile() {
 }
 
 export async function fetchPublicProfile(userId: string) {
+  const safeUserId = assertUuid(userId, 'profile id');
   const client = requireSupabase();
 
   const { data: profile, error: profileError } = await client
     .from('profiles')
     .select('id,display_name,bio,avatar_url,approximate_area,last_active_at')
-    .eq('id', userId)
+    .eq('id', safeUserId)
     .single();
 
   if (profileError) throw profileError;
@@ -79,7 +82,7 @@ export async function fetchPublicProfile(userId: string) {
   const { data: links, error: interestsError } = await client
     .from('user_interests')
     .select('interests(slug,label,emoji)')
-    .eq('user_id', userId);
+    .eq('user_id', safeUserId);
 
   if (interestsError) throw interestsError;
 

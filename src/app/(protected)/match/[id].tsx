@@ -7,7 +7,7 @@ import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
 import { fetchMyProfile, fetchPublicProfile } from '@/services/profile';
 
-const fallbackAvatar = require('../../../assets/branding/logo-mark.png');
+const fallbackAvatar = require('../../../../assets/branding/logo-mark.png');
 
 export default function MatchCreatedScreen() {
   const { id, profileId, name } = useLocalSearchParams<{ id: string; profileId?: string; name?: string }>();
@@ -42,7 +42,7 @@ export default function MatchCreatedScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.screen}>
-        <Image source={require('../../../assets/branding/logo-horizontal.png')} style={styles.logo} resizeMode="contain" tintColor={colors.surface} />
+        <Image source={require('../../../../assets/branding/logo-horizontal.png')} style={styles.logo} resizeMode="contain" tintColor={colors.surface} />
 
         <View style={styles.matchVisual}>
           <Animated.View entering={FadeInLeft.springify().damping(16)}>

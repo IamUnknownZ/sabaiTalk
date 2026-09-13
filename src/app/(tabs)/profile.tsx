@@ -114,7 +114,11 @@ export default function MyProfileScreen() {
         </View>
 
         <View style={styles.actions}>
-          <SabaiButton label="Edit profile" disabled={Boolean(error)} onPress={() => router.push('/(onboarding)/profile-setup')} />
+          <SabaiButton
+            label="Edit profile"
+            disabled={Boolean(error)}
+            onPress={() => router.push({ pathname: '/(onboarding)/profile-setup', params: { mode: 'edit' } })}
+          />
           <Pressable onPress={exit} disabled={exiting} style={styles.logoutButton}>
             <Text style={styles.logoutText}>{exiting ? 'Logging out…' : 'Log out'}</Text>
           </Pressable>

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 const baseUrl = process.env.QA_BASE_URL || 'http://127.0.0.1:8081';
 const port = Number(process.env.QA_CHROME_PORT || 9335);
 const screenshotsEnabled = process.env.QA_SCREENSHOTS !== '0';
+const guestGuardExpected = process.env.QA_EXPECT_GUEST_GUARD === '1';
 
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -79,6 +80,18 @@ function cdp(method, params = {}) {
   });
 }
 
+async function waitForPathname(expected, attempts = 40) {
+  for (let index = 0; index < attempts; index += 1) {
+    const { result } = await cdp('Runtime.evaluate', {
+      expression: 'location.pathname',
+      returnByValue: true,
+    });
+    if (result.value === expected) return true;
+    await sleep(100);
+  }
+  return false;
+}
+
 async function waitForRenderable(attempts = 30) {
   for (let index = 0; index < attempts; index += 1) {
     const { result } = await cdp('Runtime.evaluate', {
@@ -124,6 +137,8 @@ const routes = [
   `/match/${qaMatchId}?profileId=${qaUserId}&name=QA`,
   `/meeting/${qaUserId}?matchId=${qaMatchId}&name=QA`,
 ];
+
+const publicRoutes = new Set(['/', '/login', '/register']);
 
 const visualRoutes = new Set([
   '/login',
@@ -174,8 +189,14 @@ async function evaluatePage(route, viewport, phase) {
   const row = { viewport: viewport.name, route, phase, ...value };
   results.push(row);
 
-  if (!value.hasRoot || value.textLength === 0 || value.overflowX || value.errorText) {
-    failures.push(row);
+  const requestedPath = new URL(route, baseUrl).pathname;
+  const guestGuardFailure =
+    guestGuardExpected &&
+    !publicRoutes.has(requestedPath) &&
+    value.route.split('?')[0] !== '/login';
+
+  if (!value.hasRoot || value.textLength === 0 || value.overflowX || value.errorText || guestGuardFailure) {
+    failures.push({ ...row, guestGuardFailure });
   }
 }
 
@@ -194,10 +215,16 @@ try {
       const url = new URL(route, baseUrl).toString();
       await cdp('Page.navigate', { url });
       await waitForRenderable();
+      if (guestGuardExpected && !publicRoutes.has(new URL(route, baseUrl).pathname)) {
+        await waitForPathname('/login');
+      }
       await evaluatePage(route, viewport, 'direct');
 
       await cdp('Page.reload', { ignoreCache: true });
       await waitForRenderable();
+      if (guestGuardExpected && !publicRoutes.has(new URL(route, baseUrl).pathname)) {
+        await waitForPathname('/login');
+      }
       await evaluatePage(route, viewport, 'refresh');
 
       if (screenshotsEnabled && visualRoutes.has(route)) {

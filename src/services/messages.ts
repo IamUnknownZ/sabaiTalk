@@ -1,10 +1,12 @@
 import { requireSupabase } from '@/lib/supabase';
+import { assertUuid, normalizeRequiredText } from '@/lib/validation';
 
 export async function listMessages(matchId: string) {
+  const safeMatchId = assertUuid(matchId, 'match id');
   const { data, error } = await requireSupabase()
     .from('messages')
     .select('id,match_id,sender_id,content,created_at,read_at')
-    .eq('match_id', matchId)
+    .eq('match_id', safeMatchId)
     .order('created_at', { ascending: true })
     .limit(100);
 
@@ -13,9 +15,9 @@ export async function listMessages(matchId: string) {
 }
 
 export async function sendMessage(matchId: string, content: string) {
+  const safeMatchId = assertUuid(matchId, 'match id');
+  const trimmed = normalizeRequiredText(content, 'Message', 2000);
   const client = requireSupabase();
-  const trimmed = content.trim();
-  if (!trimmed) return;
 
   const { data: sessionData } = await client.auth.getSession();
   const senderId = sessionData.session?.user.id;
@@ -24,7 +26,7 @@ export async function sendMessage(matchId: string, content: string) {
   const { data, error } = await client
     .from('messages')
     .insert({
-      match_id: matchId,
+      match_id: safeMatchId,
       sender_id: senderId,
       content: trimmed,
     })
@@ -36,12 +38,13 @@ export async function sendMessage(matchId: string, content: string) {
 }
 
 export function subscribeToMessages(matchId: string, onInsert: (message: Record<string, unknown>) => void) {
+  const safeMatchId = assertUuid(matchId, 'match id');
   const client = requireSupabase();
   const channel = client
-    .channel(`messages:${matchId}`)
+    .channel(`messages:${safeMatchId}`)
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${matchId}` },
+      { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${safeMatchId}` },
       (payload) => onInsert(payload.new),
     )
     .subscribe();

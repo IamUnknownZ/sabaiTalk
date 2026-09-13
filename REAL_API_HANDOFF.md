@@ -20,6 +20,7 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project | Production Edge Function มีให้อัตโนมัติ |
 | `GOOGLE_PLACES_API_KEY` | Google Cloud → Places API (New) key | Supabase Edge Function Secrets |
 | `GOOGLE_ROUTES_API_KEY` | Google Cloud → Routes API key | Supabase Edge Function Secrets |
+| `ALLOWED_ORIGINS` | Production web origin allow-list | Supabase Edge Function Secrets |
 
 ---
 
@@ -302,6 +303,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 GOOGLE_PLACES_API_KEY=
 GOOGLE_ROUTES_API_KEY=
+ALLOWED_ORIGINS=
 ```
 
 ไฟล์นี้เป็น template เท่านั้น ห้ามใส่ real secret ลงในไฟล์ `.env.example`
@@ -314,12 +316,21 @@ SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
-ดังนั้น production ต้องเพิ่มเองหลัก ๆ แค่:
+ดังนั้น production ต้องเพิ่มเองหลัก ๆ:
 
 ```text
 GOOGLE_PLACES_API_KEY
 GOOGLE_ROUTES_API_KEY
+ALLOWED_ORIGINS
 ```
+
+`ALLOWED_ORIGINS` ใช้สำหรับ Web CORS ของ Edge Function เช่น:
+
+```text
+https://app.example.com,https://www.example.com
+```
+
+ไม่ต้องใส่ `*` ใน production; native app ยังใช้ Bearer auth ตามปกติและไม่ได้พึ่ง CORS เป็น security boundary
 
 ---
 
@@ -534,6 +545,7 @@ Migrations:
 ```text
 supabase/migrations/0001_initial.sql
 supabase/migrations/0002_matching_privacy_hardening.sql
+supabase/migrations/0003_security_hardening.sql
 ```
 
 ระบบหลักมี:
@@ -555,12 +567,16 @@ RPC สำคัญ:
 
 ```text
 set_my_location
+set_my_interests
+my_onboarding_status
 nearby_profiles
 like_profile
 pass_profile
 block_profile
+report_profile
 my_matches
 meeting_origins
+consume_meeting_rate_limit
 ```
 
 `meeting_origins` ต้องใช้ server/service-role เท่านั้น
@@ -609,13 +625,15 @@ SabaiTalk Routes Server
 11. ใส่ GOOGLE_PLACES_API_KEY ใน Supabase Edge Function Secrets
 12. สร้าง Routes server key
 13. ใส่ GOOGLE_ROUTES_API_KEY ใน Supabase Edge Function Secrets
-14. deploy migrations
-15. deploy meeting-recommendations Edge Function
-16. ทดสอบ Auth / Location / Nearby / Like / Pass / Match / Chat
-17. ทดสอบ Places จริง
-18. ทดสอบ Routes จริง
-19. ทดสอบ Fair Meeting จริง
-20. ทดสอบ react-native-maps บน Android device จริง
+14. ใส่ ALLOWED_ORIGINS ถ้ามี production web deployment
+15. deploy migrations รวม 0003_security_hardening.sql
+16. deploy meeting-recommendations Edge Function
+17. ตั้ง Supabase Auth rate limits / CAPTCHA / email confirmation ตาม production policy
+18. ทดสอบ Auth guard / onboarding guard / Location / Nearby / Like / Pass / Match / Chat
+19. ทดสอบ Places จริง
+20. ทดสอบ Routes จริง
+21. ทดสอบ Fair Meeting จริง
+22. ทดสอบ react-native-maps บน Android device จริง
 ```
 
 ---

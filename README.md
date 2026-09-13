@@ -79,9 +79,11 @@ For a new Supabase project:
 1. Configure/link the Supabase project.
 2. Apply `supabase/migrations/0001_initial.sql`.
 3. Apply `supabase/migrations/0002_matching_privacy_hardening.sql`.
-4. Configure `GOOGLE_PLACES_API_KEY` and `GOOGLE_ROUTES_API_KEY` as Edge Function secrets.
-5. Deploy `supabase/functions/meeting-recommendations/index.ts`.
-6. Create real tester accounts and verify Auth → Location → Discover → Match → Chat → Fair Meeting.
+4. Apply `supabase/migrations/0003_security_hardening.sql`.
+5. Configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_ROUTES_API_KEY`, and production `ALLOWED_ORIGINS` as Edge Function secrets.
+6. Deploy `supabase/functions/meeting-recommendations/index.ts`.
+7. Configure production Supabase Auth rate limits / CAPTCHA / email policy.
+8. Create real tester accounts and verify Auth Guard → Onboarding Guard → Location → Discover → Match → Chat → Fair Meeting.
 
 Do not seed fake user activity into production.
 
@@ -92,6 +94,7 @@ Before handing over or committing:
 ```bash
 npm run typecheck
 npm run lint
+npm run qa:backend
 npx expo-doctor
 ```
 

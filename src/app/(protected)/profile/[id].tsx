@@ -12,7 +12,7 @@ import { fetchMyProfile, fetchPublicProfile } from '@/services/profile';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import type { UserProfile } from '@/types/domain';
 
-const fallbackAvatar = require('../../../assets/branding/logo-mark.png');
+const fallbackAvatar = require('../../../../assets/branding/logo-mark.png');
 
 export default function ProfileDetailScreen() {
   const { id, distance } = useLocalSearchParams<{ id: string; distance?: string }>();

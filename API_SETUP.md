@@ -171,6 +171,14 @@ Expo client
 GOOGLE_ROUTES_API_KEY=
 ```
 
+For browser/web deployments also configure the Edge Function origin allow-list:
+
+```env
+ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
+```
+
+Do not use a wildcard origin in production. Localhost development origins are allowed automatically by the current function.
+
 ### User action when requested
 Detailed guide should cover:
 1. Enable Routes API.

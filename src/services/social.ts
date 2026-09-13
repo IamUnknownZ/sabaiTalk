@@ -1,4 +1,5 @@
 import { requireSupabase } from '@/lib/supabase';
+import { assertUuid } from '@/lib/validation';
 
 export type NearbyProfileRow = {
   id: string;
@@ -12,14 +13,19 @@ export type NearbyProfileRow = {
 };
 
 export async function saveMyLocation(latitude: number, longitude: number) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    throw new Error('Invalid location.');
+  }
   const { error } = await requireSupabase().rpc('set_my_location', { lat: latitude, lng: longitude });
   if (error) throw error;
 }
 
 export async function fetchNearbyProfiles(radiusKm: number): Promise<NearbyProfileRow[]> {
+  if (!Number.isFinite(radiusKm)) throw new Error('Invalid discovery radius.');
+  const safeRadiusKm = Math.min(50, Math.max(0.1, radiusKm));
   const client = requireSupabase();
   const { data, error } = await client.rpc('nearby_profiles', {
-    radius_meters: Math.round(radiusKm * 1000),
+    radius_meters: Math.round(safeRadiusKm * 1000),
     result_limit: 50,
   });
   if (error) throw error;
@@ -43,29 +49,14 @@ export async function fetchNearbyProfiles(radiusKm: number): Promise<NearbyProfi
 }
 
 export async function likeProfile(targetUserId: string) {
-  const { data, error } = await requireSupabase().rpc('like_profile', { target_user: targetUserId });
+  const targetUser = assertUuid(targetUserId, 'profile id');
+  const { data, error } = await requireSupabase().rpc('like_profile', { target_user: targetUser });
   if (error) throw error;
   return data as string | null;
 }
 
 export async function passProfile(targetUserId: string) {
-  const { error } = await requireSupabase().rpc('pass_profile', { target_user: targetUserId });
+  const targetUser = assertUuid(targetUserId, 'profile id');
+  const { error } = await requireSupabase().rpc('pass_profile', { target_user: targetUser });
   if (error) throw error;
-}
-
-export async function listMyMatches() {
-  const client = requireSupabase();
-  const { data: sessionData } = await client.auth.getSession();
-  const userId = sessionData.session?.user.id;
-  if (!userId) throw new Error('Not signed in.');
-
-  const { data, error } = await client
-    .from('matches')
-    .select('id,user_a,user_b,status,created_at')
-    .or(`user_a.eq.${userId},user_b.eq.${userId}`)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
 }

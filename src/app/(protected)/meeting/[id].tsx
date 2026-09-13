@@ -11,12 +11,12 @@ import { colors, radius, spacing, typography } from '@/constants/theme';
 import type { MeetingCategory } from '@/types/domain';
 
 const categories: { id: MeetingCategory; label: string; image: number }[] = [
-  { id: 'cafe', label: 'Cafe', image: require('../../../assets/places/cafe.png') },
-  { id: 'food', label: 'Food', image: require('../../../assets/places/food.png') },
-  { id: 'park', label: 'Park', image: require('../../../assets/places/park.png') },
-  { id: 'mall', label: 'Mall', image: require('../../../assets/places/mall.png') },
-  { id: 'cinema', label: 'Cinema', image: require('../../../assets/places/cinema.png') },
-  { id: 'study', label: 'Study', image: require('../../../assets/places/study.png') },
+  { id: 'cafe', label: 'Cafe', image: require('../../../../assets/places/cafe.png') },
+  { id: 'food', label: 'Food', image: require('../../../../assets/places/food.png') },
+  { id: 'park', label: 'Park', image: require('../../../../assets/places/park.png') },
+  { id: 'mall', label: 'Mall', image: require('../../../../assets/places/mall.png') },
+  { id: 'cinema', label: 'Cinema', image: require('../../../../assets/places/cinema.png') },
+  { id: 'study', label: 'Study', image: require('../../../../assets/places/study.png') },
 ];
 
 export default function MeetingScreen() {
@@ -179,7 +179,7 @@ export default function MeetingScreen() {
         </>
       ) : (
         <View style={styles.noPlace}>
-          <Image source={require('../../../assets/illustrations/no-place-found.png')} style={styles.noPlaceImage} resizeMode="contain" />
+          <Image source={require('../../../../assets/illustrations/no-place-found.png')} style={styles.noPlaceImage} resizeMode="contain" />
           <View style={styles.noPlaceCopy}>
             <Text style={styles.noPlaceTitle}>No destination selected</Text>
             <Text style={styles.noPlaceText}>Choose a category, then search for a real public meeting place.</Text>

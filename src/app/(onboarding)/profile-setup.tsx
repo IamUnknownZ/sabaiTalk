@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { SabaiButton } from '@/components/ui/SabaiButton';
 import { colors, spacing, typography } from '@/constants/theme';
+import { useAuthSession } from '@/providers/AuthSessionProvider';
 import { upsertMyProfile } from '@/services/profile';
 
 export default function ProfileSetupScreen() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { refreshOnboarding } = useAuthSession();
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,7 +26,12 @@ export default function ProfileSetupScreen() {
     setError('');
     try {
       await upsertMyProfile({ displayName: name.trim(), bio: bio.trim() });
-      router.push('/(onboarding)/interests');
+      await refreshOnboarding();
+      if (mode === 'edit') {
+        router.back();
+      }
+      // For first-time onboarding, the group guard advances to the next
+      // server-verified stage after refreshOnboarding().
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save profile.');
     } finally {
@@ -55,7 +63,7 @@ export default function ProfileSetupScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
 
-      <SabaiButton label={busy ? 'Saving...' : 'Choose interests'} disabled={busy || !canContinue} onPress={next} />
+      <SabaiButton label={busy ? 'Saving...' : mode === 'edit' ? 'Save profile' : 'Choose interests'} disabled={busy || !canContinue} onPress={next} />
     </Screen>
   );
 }

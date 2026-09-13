@@ -34,7 +34,7 @@ export default function RegisterScreen() {
         setNotice('Account created. Confirm your email, then log in.');
         return;
       }
-      router.replace('/(onboarding)/profile-setup');
+      // AuthLayout sends a signed-in account to the first incomplete onboarding step.
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create account.');
     } finally {

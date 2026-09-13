@@ -1,21 +1,25 @@
 import { requireSupabase } from '@/lib/supabase';
+import { assertUuid, normalizeOptionalText } from '@/lib/validation';
+
+export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'fake' | 'safety' | 'other';
+
+const reportReasons = new Set<ReportReason>(['spam', 'harassment', 'inappropriate', 'fake', 'safety', 'other']);
 
 export async function blockProfile(targetUserId: string) {
-  const { error } = await requireSupabase().rpc('block_profile', { target_user: targetUserId });
+  const targetUser = assertUuid(targetUserId, 'profile id');
+  const { error } = await requireSupabase().rpc('block_profile', { target_user: targetUser });
   if (error) throw error;
 }
 
-export async function reportProfile(targetUserId: string, reason: string, details?: string) {
-  const client = requireSupabase();
-  const { data } = await client.auth.getSession();
-  const reporterId = data.session?.user.id;
-  if (!reporterId) throw new Error('Not signed in.');
+export async function reportProfile(targetUserId: string, reason: ReportReason, details?: string) {
+  const targetUser = assertUuid(targetUserId, 'profile id');
+  if (!reportReasons.has(reason)) throw new Error('Invalid report reason.');
+  const normalizedDetails = normalizeOptionalText(details, 1000);
 
-  const { error } = await client.from('reports').insert({
-    reporter_id: reporterId,
-    reported_id: targetUserId,
-    reason,
-    details: details?.trim() || null,
+  const { error } = await requireSupabase().rpc('report_profile', {
+    target_user: targetUser,
+    report_reason: reason,
+    report_details: normalizedDetails,
   });
 
   if (error) throw error;
